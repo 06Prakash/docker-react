@@ -1,0 +1,118 @@
+# GitHub Actions Troubleshooting Guide
+
+This guide helps resolve common issues with the CI/CD pipeline.
+
+## Common Issues and Solutions
+
+### 1. npm ci fails with lock file sync error
+
+**Error:**
+```
+npm error `npm ci` can only install packages when your package.json and package-lock.json are in sync
+```
+
+**Solutions:**
+- Delete `package-lock.json` and run `npm install` to regenerate it
+- Make sure both files are committed to the repository
+- Use the fallback strategy: `npm ci || npm install`
+
+### 2. Deprecated Actions Warnings
+
+**Error:**
+```
+This request has been automatically failed because it uses a deprecated version of actions/upload-artifact: v3
+```
+
+**Solution:**
+Update to latest action versions:
+- `actions/upload-artifact@v4`
+- `github/codeql-action/upload-sarif@v3`
+- Use specific versions instead of `@master` or `@v0`
+
+### 3. Docker Build Failures
+
+**Common issues:**
+- Missing package-lock.json in Docker context
+- Network issues during package installation
+- Out of memory during build
+
+**Solutions:**
+- Use multi-stage builds to reduce image size
+- Add fallback installation commands
+- Increase Docker memory limits if needed
+
+### 4. Test Failures in CI
+
+**Common causes:**
+- Environment differences between local and CI
+- Missing test dependencies
+- Browser/headless environment issues
+
+**Solutions:**
+- Set `CI=true` environment variable
+- Use `--passWithNoTests` flag
+- Add proper test setup files
+
+## Debugging Tips
+
+### Check GitHub Actions Logs
+1. Go to the "Actions" tab in your repository
+2. Click on the failed workflow run
+3. Expand the failed step to see detailed logs
+
+### Test Locally
+```bash
+# Test the same commands locally
+npm ci
+npm test -- --watchAll=false --ci
+docker build -t test-image .
+```
+
+### Validate Workflow Syntax
+```bash
+# Use the validation script
+./scripts/validate-workflow.sh
+```
+
+## Environment Setup
+
+### Required Repository Settings
+- Actions must be enabled
+- Secrets configured if needed
+- Branch protection rules (optional)
+
+### Local Development Requirements
+- Node.js 18+
+- Docker
+- Git
+- npm or yarn
+
+## Quick Fixes
+
+### Regenerate Lock File
+```bash
+rm package-lock.json
+npm install
+git add package-lock.json
+git commit -m "Regenerate package-lock.json"
+```
+
+### Reset Docker
+```bash
+docker system prune -f
+docker build --no-cache -t react-docker-app .
+```
+
+### Force Fresh Install
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+## Getting Help
+
+If issues persist:
+1. Check the [GitHub Actions documentation](https://docs.github.com/en/actions)
+2. Review action-specific documentation on GitHub Marketplace
+3. Check repository issues and discussions
+4. Ensure all required files are committed and pushed
