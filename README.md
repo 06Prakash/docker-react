@@ -84,11 +84,60 @@ This application is configured for easy deployment to AWS services:
 
 ## CI/CD Pipeline
 
-Perfect for learning CI/CD with tools like:
-- AWS CodePipeline
-- AWS CodeBuild
-- GitHub Actions
-- GitLab CI/CD
+This project includes a comprehensive GitHub Actions CI/CD pipeline that:
+
+### 🧪 **Testing Phase**
+
+- Runs unit tests with Jest and React Testing Library
+- Generates test coverage reports
+- Uploads test results as artifacts
+
+### 🐳 **Docker Testing Phase**
+
+- Builds the Docker image
+- Runs comprehensive container tests:
+  - Container startup verification
+  - HTTP response testing
+  - Content validation
+  - Nginx configuration validation
+  - Image size optimization check
+  - Basic security checks
+
+### 🔒 **Security Scanning**
+
+- Runs Trivy vulnerability scanner
+- Uploads security scan results to GitHub Security tab
+
+### 📦 **Build and Push**
+
+- Builds multi-architecture images (AMD64, ARM64)
+- Pushes to GitHub Container Registry
+- Generates Software Bill of Materials (SBOM)
+- Uses build caching for optimization
+
+### 🚀 **Deployment**
+
+- Automated staging deployment on main branch
+- Environment protection rules
+- Ready for AWS integration
+
+### Manual Testing
+
+You can run the Docker tests manually using the provided scripts:
+
+```bash
+# Make scripts executable
+chmod +x scripts/*.sh
+
+# Run comprehensive Docker tests
+./scripts/test-docker.sh
+
+# Run health check
+./scripts/health-check.sh http://localhost:3000
+
+# Run unit tests
+npm test
+```
 
 ## Project Structure
 
