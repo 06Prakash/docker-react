@@ -26,7 +26,9 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
-      run: npm ci
+      run: |
+        # Try npm ci first (preferred for CI), fallback to npm install if it fails
+        npm ci || npm install
       
     - name: Run tests
       run: npm test -- --coverage --ci --testResultsProcessor=jest-junit --watchAll=false --passWithNoTests
