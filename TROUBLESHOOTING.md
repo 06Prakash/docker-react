@@ -87,7 +87,27 @@ Error: Resource not accessible by integration
 - Download the `trivy-scan-results` artifact from the Actions run
 - Consider running security scans locally with the provided script
 
-### 5. Docker Build Failures
+### 5. SBOM Generation Failures
+
+**Error: Could not determine source**
+```
+could not determine source: errors occurred attempting to resolve 'ghcr.io/username/repo:latest'
+```
+**Solution:**
+- SBOM generation now uses local image instead of registry image
+- Has fallback to Syft direct installation
+- SBOM step won't fail the build (continue-on-error: true)
+
+**Error: Image not found for SBOM**
+```
+docker: could not parse reference: ghcr.io/username/repo:latest
+```
+**Solution:**
+- Build local image first before SBOM generation
+- Use local image tag instead of registry reference
+- SBOM generation is optional and won't block deployment
+
+### 6. Docker Build Failures
 
 **Common issues:**
 - Missing package-lock.json in Docker context
