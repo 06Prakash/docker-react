@@ -67,7 +67,27 @@ Environment health has transitioned from Info to Severe
 - Verify your Docker container exposes port 80
 - Ensure your app responds to HTTP requests on port 80
 
-### 4. Docker Build Failures
+### 4. Security Scan Issues
+
+**Error: Resource not accessible by integration**
+```
+Warning: Resource not accessible by integration - https://docs.github.com/rest
+```
+**Solution:**
+- This happens when GitHub Advanced Security is not enabled
+- The workflow will continue - security scan results are uploaded as artifacts instead
+- To enable: Go to Repository Settings → Security & analysis → Enable GitHub Advanced Security
+
+**Error: SARIF upload failed**
+```
+Error: Resource not accessible by integration
+```
+**Solution:**
+- Security scans will still run and results are available as artifacts
+- Download the `trivy-scan-results` artifact from the Actions run
+- Consider running security scans locally with the provided script
+
+### 5. Docker Build Failures
 
 **Common issues:**
 - Missing package-lock.json in Docker context

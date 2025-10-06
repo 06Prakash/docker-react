@@ -149,11 +149,27 @@ jobs:
         output: 'trivy-results.sarif'
         exit-code: '0'  # Don't fail the build on vulnerabilities
         
-    - name: Upload Trivy scan results
+    - name: Run Trivy vulnerability scanner (table format)
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ env.IMAGE_NAME }}:latest
+        format: 'table'
+        exit-code: '0'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
         sarif_file: 'trivy-results.sarif'
+      continue-on-error: true  # Don't fail if SARIF upload fails
+        
+    - name: Upload Trivy scan results as artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: trivy-scan-results
+        path: trivy-results.sarif
+        retention-days: 30
 
   build-and-push:
     name: Build and Push to Registry
@@ -217,7 +233,7 @@ jobs:
   deploy-staging:
     name: Deploy to AWS Elastic Beanstalk
     runs-on: ubuntu-latest
-    needs: [build-and-push, security-scan]
+    needs: [build-and-push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
