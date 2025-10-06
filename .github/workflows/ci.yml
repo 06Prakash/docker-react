@@ -280,25 +280,6 @@ jobs:
         echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
         aws sts get-caller-identity
         
-    - name: Create Dockerrun.aws.json
-      run: |
-        cat > Dockerrun.aws.json << EOF
-        {
-          "AWSEBDockerrunVersion": "1",
-          "Image": {
-            "Name": "${{ env.REGISTRY }}/${{ github.repository }}:latest",
-            "Update": "true"
-          },
-          "Ports": [
-            {
-              "ContainerPort": "80",
-              "HostPort": "80"
-            }
-          ],
-          "Logging": "/var/log/nginx"
-        }
-        EOF
-        
     - name: Create application version
       run: |
         # Get AWS account ID and region
@@ -321,6 +302,24 @@ jobs:
         else
           echo "S3 bucket already exists: $S3_BUCKET"
         fi
+        
+        # Test with simple nginx first to verify deployment mechanism
+        echo "🧪 Creating test deployment with nginx to verify infrastructure..."
+        cat > Dockerrun.aws.json << EOF
+        {
+          "AWSEBDockerrunVersion": "1",
+          "Image": {
+            "Name": "nginx:alpine",
+            "Update": "true"
+          },
+          "Ports": [
+            {
+              "ContainerPort": "80",
+              "HostPort": "80"
+            }
+          ]
+        }
+        EOF
         
         # Create deployment package
         zip -r deploy-package.zip Dockerrun.aws.json
@@ -372,7 +371,25 @@ jobs:
         echo "🌐 Application URL: http://$ENV_URL"
         
         if [ "$ENV_HEALTH" != "Green" ]; then
-          echo "⚠️ Environment health is not Green. Check AWS console for details."
+          echo "⚠️ Environment health is not Green. Getting detailed logs..."
+          
+          # Get recent logs for debugging
+          echo "🔍 Recent deployment events:"
+          aws elasticbeanstalk describe-events \
+            --application-name "${EB_APPLICATION_NAME}" \
+            --environment-name "${EB_ENVIRONMENT_NAME}" \
+            --max-records 20 \
+            --query 'Events[*].[EventDate,Severity,Message]' \
+            --output table
+            
+          # Get environment resources status
+          echo "🔍 Environment resources:"
+          aws elasticbeanstalk describe-environment-resources \
+            --environment-name "${EB_ENVIRONMENT_NAME}" \
+            --query 'EnvironmentResources.Instances[*].[InstanceId]' \
+            --output table
+          
+          echo "❌ Check AWS Elastic Beanstalk console for detailed logs and health dashboard."
           exit 1
         fi
         
