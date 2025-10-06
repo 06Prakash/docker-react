@@ -29,7 +29,45 @@ Update to latest action versions:
 - `github/codeql-action/upload-sarif@v3`
 - Use specific versions instead of `@master` or `@v0`
 
-### 3. Docker Build Failures
+### 3. AWS Elastic Beanstalk Deployment Failures
+
+**Common Errors:**
+
+**Error: Access Denied**
+```
+An error occurred (AccessDenied) when calling the CreateApplicationVersion operation
+```
+**Solution:**
+- Check IAM permissions include: `AdministratorAccess-AWSElasticBeanstalk`
+- Verify AWS credentials are correctly set in GitHub secrets
+
+**Error: Environment Not Found**
+```
+No Environment found for EnvironmentName: 'your-env-name'
+```
+**Solution:**
+- Verify `EB_APPLICATION_NAME` and `EB_ENVIRONMENT_NAME` secrets match your actual EB setup
+- Check the environment exists and is in the correct region
+
+**Error: Invalid Dockerrun.aws.json**
+```
+Invalid dockerrun format
+```
+**Solution:**
+- Ensure your Docker image is accessible from EB
+- Check the image registry permissions
+- Verify the image tag exists
+
+**Error: Health Check Failures**
+```
+Environment health has transitioned from Info to Severe
+```
+**Solution:**
+- Check EB logs in AWS Console
+- Verify your Docker container exposes port 80
+- Ensure your app responds to HTTP requests on port 80
+
+### 4. Docker Build Failures
 
 **Common issues:**
 - Missing package-lock.json in Docker context

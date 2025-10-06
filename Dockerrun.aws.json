@@ -1,0 +1,16 @@
+{
+  "AWSEBDockerrunVersion": "1",
+  "Image": {
+    "Name": "ghcr.io/06prakash/docker-react:latest",
+    "Update": "true"
+  },
+  "Ports": [
+    {
+      "ContainerPort": "80",
+      "HostPort": "80"
+    }
+  ],
+  "Logging": "/var/log/nginx",
+  "Volumes": [],
+  "Environment": []
+}

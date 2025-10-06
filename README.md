@@ -118,8 +118,28 @@ This project includes a comprehensive GitHub Actions CI/CD pipeline that:
 ### 🚀 **Deployment**
 
 - Automated staging deployment on main branch
+- Deploys to AWS Elastic Beanstalk
+- Includes health checks and rollback capabilities
 - Environment protection rules
-- Ready for AWS integration
+
+#### **AWS Elastic Beanstalk Deployment**
+
+The CI/CD pipeline automatically deploys to AWS Elastic Beanstalk when code is pushed to the main branch:
+
+1. **Builds** the Docker image and pushes to GitHub Container Registry
+2. **Creates** Dockerrun.aws.json for EB deployment
+3. **Uploads** deployment package to S3
+4. **Creates** new application version in EB
+5. **Deploys** to the specified environment
+6. **Monitors** deployment progress and health
+7. **Tests** the deployed application
+
+#### **Required GitHub Secrets:**
+- `AWS_ACCESS_KEY_ID` - AWS IAM access key
+- `AWS_SECRET_ACCESS_KEY` - AWS IAM secret key  
+- `AWS_REGION` - AWS region (e.g., us-east-1)
+- `EB_APPLICATION_NAME` - Elastic Beanstalk application name
+- `EB_ENVIRONMENT_NAME` - Elastic Beanstalk environment name
 
 ### Manual Testing
 
