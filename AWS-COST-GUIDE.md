@@ -5,10 +5,13 @@ This guide helps you keep your AWS Elastic Beanstalk deployment within free tier
 ## 💰 Free Tier Limits (12 months from account creation)
 
 ### ✅ What's FREE:
+
 - **EC2**: 750 hours/month of t2.micro or t3.micro instances
 - **S3**: 5GB storage, 20,000 GET requests, 2,000 PUT requests
 - **Data Transfer**: 1GB/month to internet
 - **Elastic Beanstalk**: Platform itself is always free
+
+**Note**: The deployment automatically creates an S3 bucket named `elasticbeanstalk-{region}-{account-id}` for storing deployment artifacts. This uses minimal S3 storage (typically <1MB per deployment) and stays well within free tier limits.
 
 ### 💡 Current Configuration (Optimized for Free Tier):
 

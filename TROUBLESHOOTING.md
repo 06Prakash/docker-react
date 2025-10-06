@@ -58,6 +58,15 @@ Invalid dockerrun format
 - Check the image registry permissions
 - Verify the image tag exists
 
+**Error: S3 Bucket Not Found**
+```
+An error occurred (NoSuchBucket) when calling the PutObject operation: The specified bucket does not exist
+```
+**Solution:**
+- The deployment now automatically creates the required S3 bucket
+- Ensure your IAM user has `AmazonS3FullAccess` permissions
+- The bucket follows AWS naming: `elasticbeanstalk-{region}-{account-id}`
+
 **Error: Health Check Failures**
 ```
 Environment health has transitioned from Info to Severe

@@ -285,16 +285,38 @@ jobs:
         
     - name: Create application version
       run: |
+        # Get AWS account ID and region
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        S3_BUCKET="elasticbeanstalk-${{ secrets.AWS_REGION }}-${AWS_ACCOUNT_ID}"
+        
+        echo "Using S3 bucket: $S3_BUCKET"
+        
+        # Create S3 bucket if it doesn't exist
+        if ! aws s3 ls "s3://$S3_BUCKET" 2>/dev/null; then
+          echo "Creating S3 bucket: $S3_BUCKET"
+          if [ "${{ secrets.AWS_REGION }}" = "us-east-1" ]; then
+            aws s3 mb "s3://$S3_BUCKET"
+          else
+            aws s3 mb "s3://$S3_BUCKET" --region "${{ secrets.AWS_REGION }}"
+          fi
+          
+          # Wait a moment for bucket to be available
+          sleep 5
+        else
+          echo "S3 bucket already exists: $S3_BUCKET"
+        fi
+        
         # Create deployment package
         zip -r deploy-package.zip Dockerrun.aws.json
         
-        # Upload to S3 and create application version
-        aws s3 cp deploy-package.zip s3://elasticbeanstalk-${{ secrets.AWS_REGION }}-$(aws sts get-caller-identity --query Account --output text)/
+        # Upload to S3
+        aws s3 cp deploy-package.zip "s3://$S3_BUCKET/"
         
+        # Create application version
         aws elasticbeanstalk create-application-version \
           --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
           --version-label "${{ github.sha }}" \
-          --source-bundle S3Bucket="elasticbeanstalk-${{ secrets.AWS_REGION }}-$(aws sts get-caller-identity --query Account --output text)",S3Key="deploy-package.zip" \
+          --source-bundle S3Bucket="$S3_BUCKET",S3Key="deploy-package.zip" \
           --description "Deploy from GitHub Actions - ${{ github.sha }}"
           
     - name: Deploy to Elastic Beanstalk

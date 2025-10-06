@@ -135,11 +135,21 @@ The CI/CD pipeline automatically deploys to AWS Elastic Beanstalk when code is p
 7. **Tests** the deployed application
 
 #### **Required GitHub Secrets:**
+
 - `AWS_ACCESS_KEY_ID` - AWS IAM access key
 - `AWS_SECRET_ACCESS_KEY` - AWS IAM secret key  
 - `AWS_REGION` - AWS region (e.g., us-east-1)
 - `EB_APPLICATION_NAME` - Elastic Beanstalk application name
 - `EB_ENVIRONMENT_NAME` - Elastic Beanstalk environment name
+
+#### **Required AWS IAM Permissions:**
+
+Your IAM user needs these policies:
+- `AdministratorAccess-AWSElasticBeanstalk` - For EB operations
+- `AWSElasticBeanstalkWebTier` - For web application deployment  
+- `AWSElasticBeanstalkService` - For service operations
+- `AmazonS3FullAccess` - For deployment artifacts storage (S3 bucket auto-creation)
+- `CloudWatchLogsFullAccess` - For deployment monitoring
 
 ### Manual Testing
 
