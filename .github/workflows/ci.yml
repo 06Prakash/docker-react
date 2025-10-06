@@ -253,6 +253,13 @@ jobs:
     needs: [build-and-push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+      EB_APPLICATION_NAME: ${{ secrets.EB_APPLICATION_NAME }}
+      EB_ENVIRONMENT_NAME: ${{ secrets.EB_ENVIRONMENT_NAME }}
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -263,6 +270,15 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
+        
+    - name: Debug environment variables
+      run: |
+        echo "🔍 Debug Info:"
+        echo "AWS Region: ${AWS_DEFAULT_REGION}"
+        echo "EB Application Name: ${EB_APPLICATION_NAME}"
+        echo "EB Environment Name: ${EB_ENVIRONMENT_NAME}"
+        echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
+        aws sts get-caller-identity
         
     - name: Create Dockerrun.aws.json
       run: |
@@ -287,17 +303,17 @@ jobs:
       run: |
         # Get AWS account ID and region
         AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        S3_BUCKET="elasticbeanstalk-${{ secrets.AWS_REGION }}-${AWS_ACCOUNT_ID}"
+        S3_BUCKET="elasticbeanstalk-${AWS_DEFAULT_REGION}-${AWS_ACCOUNT_ID}"
         
         echo "Using S3 bucket: $S3_BUCKET"
         
         # Create S3 bucket if it doesn't exist
         if ! aws s3 ls "s3://$S3_BUCKET" 2>/dev/null; then
           echo "Creating S3 bucket: $S3_BUCKET"
-          if [ "${{ secrets.AWS_REGION }}" = "us-east-1" ]; then
+          if [ "${AWS_DEFAULT_REGION}" = "us-east-1" ]; then
             aws s3 mb "s3://$S3_BUCKET"
           else
-            aws s3 mb "s3://$S3_BUCKET" --region "${{ secrets.AWS_REGION }}"
+            aws s3 mb "s3://$S3_BUCKET" --region "${AWS_DEFAULT_REGION}"
           fi
           
           # Wait a moment for bucket to be available
@@ -314,7 +330,7 @@ jobs:
         
         # Create application version
         aws elasticbeanstalk create-application-version \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
+          --application-name "${EB_APPLICATION_NAME}" \
           --version-label "${{ github.sha }}" \
           --source-bundle S3Bucket="$S3_BUCKET",S3Key="deploy-package.zip" \
           --description "Deploy from GitHub Actions - ${{ github.sha }}"
@@ -322,33 +338,33 @@ jobs:
     - name: Deploy to Elastic Beanstalk
       run: |
         aws elasticbeanstalk update-environment \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
-          --environment-name "${{ secrets.EB_ENVIRONMENT_NAME }}" \
+          --application-name "${EB_APPLICATION_NAME}" \
+          --environment-name "${EB_ENVIRONMENT_NAME}" \
           --version-label "${{ github.sha }}"
           
     - name: Wait for deployment
       run: |
         echo "⏳ Waiting for deployment to complete..."
         aws elasticbeanstalk wait environment-updated \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
-          --environment-name "${{ secrets.EB_ENVIRONMENT_NAME }}"
+          --application-name "${EB_APPLICATION_NAME}" \
+          --environment-name "${EB_ENVIRONMENT_NAME}"
         echo "✅ Deployment completed!"
         
     - name: Get deployment status
       run: |
         ENV_STATUS=$(aws elasticbeanstalk describe-environments \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
-          --environment-names "${{ secrets.EB_ENVIRONMENT_NAME }}" \
+          --application-name "${EB_APPLICATION_NAME}" \
+          --environment-names "${EB_ENVIRONMENT_NAME}" \
           --query 'Environments[0].Status' --output text)
           
         ENV_HEALTH=$(aws elasticbeanstalk describe-environments \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
-          --environment-names "${{ secrets.EB_ENVIRONMENT_NAME }}" \
+          --application-name "${EB_APPLICATION_NAME}" \
+          --environment-names "${EB_ENVIRONMENT_NAME}" \
           --query 'Environments[0].Health' --output text)
           
         ENV_URL=$(aws elasticbeanstalk describe-environments \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
-          --environment-names "${{ secrets.EB_ENVIRONMENT_NAME }}" \
+          --application-name "${EB_APPLICATION_NAME}" \
+          --environment-names "${EB_ENVIRONMENT_NAME}" \
           --query 'Environments[0].CNAME' --output text)
           
         echo "🚀 Deployment Status: $ENV_STATUS"
@@ -363,8 +379,8 @@ jobs:
     - name: Test deployed application
       run: |
         ENV_URL=$(aws elasticbeanstalk describe-environments \
-          --application-name "${{ secrets.EB_APPLICATION_NAME }}" \
-          --environment-names "${{ secrets.EB_ENVIRONMENT_NAME }}" \
+          --application-name "${EB_APPLICATION_NAME}" \
+          --environment-names "${EB_ENVIRONMENT_NAME}" \
           --query 'Environments[0].CNAME' --output text)
           
         echo "🧪 Testing deployed application..."
