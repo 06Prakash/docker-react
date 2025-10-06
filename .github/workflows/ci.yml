@@ -314,7 +314,7 @@ jobs:
           
         echo "🚀 Deployment Status: $ENV_STATUS"
         echo "❤️ Environment Health: $ENV_HEALTH"
-        echo "🌐 Application URL: https://$ENV_URL"
+        echo "🌐 Application URL: http://$ENV_URL"
         
         if [ "$ENV_HEALTH" != "Green" ]; then
           echo "⚠️ Environment health is not Green. Check AWS console for details."
@@ -333,9 +333,9 @@ jobs:
         # Wait a bit for the application to be fully ready
         sleep 30
         
-        # Test HTTP response
+        # Test HTTP response (using HTTP for single instance)
         for i in {1..5}; do
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://$ENV_URL" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://$ENV_URL" || echo "000")
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Application is responding correctly (HTTP $HTTP_CODE)"
             break
@@ -349,7 +349,7 @@ jobs:
         done
         
         # Test content
-        CONTENT=$(curl -s "https://$ENV_URL")
+        CONTENT=$(curl -s "http://$ENV_URL")
         if echo "$CONTENT" | grep -q "React Docker App"; then
           echo "✅ Application content verified - React app is running!"
         else
@@ -357,4 +357,4 @@ jobs:
           exit 1
         fi
         
-        echo "🎉 Deployment successful! Application is live at: https://$ENV_URL"
+        echo "🎉 Deployment successful! Application is live at: http://$ENV_URL"
