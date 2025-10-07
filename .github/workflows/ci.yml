@@ -8,8 +8,13 @@ on:
 
 env:
   IMAGE_NAME: react-docker-app
-  REGISTRY: ghcr.io
+  DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+  DOCKER_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: ${{ secrets.AWS_REGION }}
+  EB_APPLICATION_NAME: ${{ secrets.EB_APPLICATION_NAME }}
+  EB_ENVIRONMENT_NAME: ${{ secrets.EB_ENVIRONMENT_NAME }}
 
 jobs:
   test:
@@ -55,8 +60,7 @@ jobs:
     needs: test
     
     outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-      image-tag: ${{ steps.meta.outputs.tags }}
+      image-tag: ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
     
     steps:
     - name: Checkout code
@@ -68,14 +72,14 @@ jobs:
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_TOKEN }}
         
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
+        images: ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -89,7 +93,7 @@ jobs:
         context: .
         platforms: linux/amd64
         push: false
-        tags: ${{ steps.meta.outputs.tags }}
+        tags: ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -263,40 +267,11 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ github.repository }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
-          
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
-        
-    - name: Extract metadata for push
-      id: push-meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_TOKEN }}
         
     - name: Generate SBOM for loaded image
       uses: anchore/sbom-action@v0.17.2
@@ -316,16 +291,12 @@ jobs:
         syft ${{ env.IMAGE_NAME }} -o spdx-json=sbom.spdx.json || echo "SBOM generation skipped"
       continue-on-error: true
         
-    - name: Re-tag and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.push-meta.outputs.tags }}
-        labels: ${{ steps.push-meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: Push Docker image to Docker Hub
+      run: |
+        IMAGE_TAG="${{ needs.build-docker.outputs.image-tag }}"
+        echo "Pushing image: $IMAGE_TAG"
+        docker push "$IMAGE_TAG"
+        echo "✅ Successfully pushed to Docker Hub"
         
     - name: Upload SBOM
       uses: actions/upload-artifact@v4
@@ -341,13 +312,6 @@ jobs:
     needs: [build-and-push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      EB_APPLICATION_NAME: ${{ secrets.EB_APPLICATION_NAME }}
-      EB_ENVIRONMENT_NAME: ${{ secrets.EB_ENVIRONMENT_NAME }}
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -355,16 +319,17 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
         
     - name: Debug environment variables
       run: |
         echo "🔍 Debug Info:"
-        echo "AWS Region: ${AWS_DEFAULT_REGION}"
-        echo "EB Application Name: ${EB_APPLICATION_NAME}"
-        echo "EB Environment Name: ${EB_ENVIRONMENT_NAME}"
+        echo "AWS Region: ${{ env.AWS_REGION }}"
+        echo "EB Application Name: ${{ env.EB_APPLICATION_NAME }}"
+        echo "EB Environment Name: ${{ env.EB_ENVIRONMENT_NAME }}"
+        echo "Docker Image: ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
         echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
         aws sts get-caller-identity
         
@@ -372,17 +337,17 @@ jobs:
       run: |
         # Get AWS account ID and region
         AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        S3_BUCKET="elasticbeanstalk-${AWS_DEFAULT_REGION}-${AWS_ACCOUNT_ID}"
+        S3_BUCKET="elasticbeanstalk-${{ env.AWS_REGION }}-${AWS_ACCOUNT_ID}"
         
         echo "Using S3 bucket: $S3_BUCKET"
         
         # Create S3 bucket if it doesn't exist
         if ! aws s3 ls "s3://$S3_BUCKET" 2>/dev/null; then
           echo "Creating S3 bucket: $S3_BUCKET"
-          if [ "${AWS_DEFAULT_REGION}" = "us-east-1" ]; then
+          if [ "${{ env.AWS_REGION }}" = "us-east-1" ]; then
             aws s3 mb "s3://$S3_BUCKET"
           else
-            aws s3 mb "s3://$S3_BUCKET" --region "${AWS_DEFAULT_REGION}"
+            aws s3 mb "s3://$S3_BUCKET" --region "${{ env.AWS_REGION }}"
           fi
           
           # Wait a moment for bucket to be available
@@ -397,7 +362,7 @@ jobs:
         {
           "AWSEBDockerrunVersion": "1",
           "Image": {
-            "Name": "${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest",
+            "Name": "${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest",
             "Update": "true"
           },
           "Ports": [
@@ -410,7 +375,7 @@ jobs:
         }
         EOF
         
-        echo "✅ Using Docker Hub image: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
+        echo "✅ Using Docker Hub image: ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
         
         # Create deployment package
         zip -r deploy-package.zip Dockerrun.aws.json
@@ -420,7 +385,7 @@ jobs:
         
         # Create application version
         aws elasticbeanstalk create-application-version \
-          --application-name "${EB_APPLICATION_NAME}" \
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
           --version-label "${{ github.sha }}" \
           --source-bundle S3Bucket="$S3_BUCKET",S3Key="deploy-package.zip" \
           --description "Deploy from GitHub Actions - ${{ github.sha }}"
@@ -428,33 +393,33 @@ jobs:
     - name: Deploy to Elastic Beanstalk
       run: |
         aws elasticbeanstalk update-environment \
-          --application-name "${EB_APPLICATION_NAME}" \
-          --environment-name "${EB_ENVIRONMENT_NAME}" \
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
+          --environment-name "${{ env.EB_ENVIRONMENT_NAME }}" \
           --version-label "${{ github.sha }}"
           
     - name: Wait for deployment
       run: |
         echo "⏳ Waiting for deployment to complete..."
         aws elasticbeanstalk wait environment-updated \
-          --application-name "${EB_APPLICATION_NAME}" \
-          --environment-name "${EB_ENVIRONMENT_NAME}"
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
+          --environment-name "${{ env.EB_ENVIRONMENT_NAME }}"
         echo "✅ Deployment completed!"
         
     - name: Get deployment status
       run: |
         ENV_STATUS=$(aws elasticbeanstalk describe-environments \
-          --application-name "${EB_APPLICATION_NAME}" \
-          --environment-names "${EB_ENVIRONMENT_NAME}" \
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
+          --environment-names "${{ env.EB_ENVIRONMENT_NAME }}" \
           --query 'Environments[0].Status' --output text)
           
         ENV_HEALTH=$(aws elasticbeanstalk describe-environments \
-          --application-name "${EB_APPLICATION_NAME}" \
-          --environment-names "${EB_ENVIRONMENT_NAME}" \
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
+          --environment-names "${{ env.EB_ENVIRONMENT_NAME }}" \
           --query 'Environments[0].Health' --output text)
           
         ENV_URL=$(aws elasticbeanstalk describe-environments \
-          --application-name "${EB_APPLICATION_NAME}" \
-          --environment-names "${EB_ENVIRONMENT_NAME}" \
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
+          --environment-names "${{ env.EB_ENVIRONMENT_NAME }}" \
           --query 'Environments[0].CNAME' --output text)
           
         echo "🚀 Deployment Status: $ENV_STATUS"
@@ -467,8 +432,8 @@ jobs:
           # Get recent logs for debugging
           echo "🔍 Recent deployment events:"
           aws elasticbeanstalk describe-events \
-            --application-name "${EB_APPLICATION_NAME}" \
-            --environment-name "${EB_ENVIRONMENT_NAME}" \
+            --application-name "${{ env.EB_APPLICATION_NAME }}" \
+            --environment-name "${{ env.EB_ENVIRONMENT_NAME }}" \
             --max-records 20 \
             --query 'Events[*].[EventDate,Severity,Message]' \
             --output table
@@ -476,7 +441,7 @@ jobs:
           # Get environment resources status
           echo "🔍 Environment resources:"
           aws elasticbeanstalk describe-environment-resources \
-            --environment-name "${EB_ENVIRONMENT_NAME}" \
+            --environment-name "${{ env.EB_ENVIRONMENT_NAME }}" \
             --query 'EnvironmentResources.Instances[*].[InstanceId]' \
             --output table
           
@@ -487,8 +452,8 @@ jobs:
     - name: Test deployed application
       run: |
         ENV_URL=$(aws elasticbeanstalk describe-environments \
-          --application-name "${EB_APPLICATION_NAME}" \
-          --environment-names "${EB_ENVIRONMENT_NAME}" \
+          --application-name "${{ env.EB_APPLICATION_NAME }}" \
+          --environment-names "${{ env.EB_ENVIRONMENT_NAME }}" \
           --query 'Environments[0].CNAME' --output text)
           
         echo "🧪 Testing deployed application..."
